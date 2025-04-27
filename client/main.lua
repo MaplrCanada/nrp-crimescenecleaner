@@ -249,7 +249,7 @@ local function DetachCleaningEquipment()
     end
 end
 
--- Clean crime scene function (Updated animation)
+-- Clean crime scene function (with UI status update)
 local function CleanCrimeScene()
     if not currentScene then return end
     
@@ -277,6 +277,12 @@ local function CleanCrimeScene()
     
     -- Now play the cleaning animation
     TaskPlayAnim(playerPed, dict, anim, 8.0, -8.0, -1, Config.CleaningAnimations.flag, 0, false, false, false)
+    
+    -- Update UI to show "in progress"
+    SendNUIMessage({
+        action = "updateSceneStatus",
+        status = "In Progress"
+    })
     
     QBCore.Functions.Progressbar("clean_scene", "Cleaning crime scene...", Config.CleaningTime * 1000, false, true, {
         disableMovement = true,
@@ -319,6 +325,12 @@ local function CleanCrimeScene()
             currentScene.blip = nil
         end
         
+        -- Update UI to show "completed"
+        SendNUIMessage({
+            action = "updateSceneStatus",
+            status = "Completed"
+        })
+        
         -- Notify server about completion
         TriggerServerEvent("crime-cleaner:server:SceneCleaned")
         
@@ -327,11 +339,34 @@ local function CleanCrimeScene()
         
         -- Get a new scene
         Wait(1000)
-        SelectCrimeScene()
+        local newScene = SelectCrimeScene()
+        
+        -- Update UI with new scene info if available
+        if newScene then
+            SendNUIMessage({
+                action = "showJobInfo",
+                jobActive = true,
+                currentScene = newScene.data.label
+            })
+        else
+            SendNUIMessage({
+                action = "showJobInfo",
+                jobActive = true,
+                currentScene = "No scenes available"
+            })
+        end
+        
         QBCore.Functions.Notify("Crime scene cleaned! Head to the next location.", "success")
     end, function() -- Cancel
         StopAnimTask(playerPed, dict, anim, 1.0)
         DetachCleaningEquipment()
+        
+        -- Reset UI status on cancel
+        SendNUIMessage({
+            action = "updateSceneStatus",
+            status = "Pending"
+        })
+        
         QBCore.Functions.Notify("Cleaning cancelled.", "error")
     end)
 end
@@ -425,7 +460,17 @@ RegisterNUICallback('cleanScene', function(data, cb)
     cb('ok')
 end)
 
--- Create thread for job center interaction
+RegisterNUICallback('navigateToJob', function(data, cb)
+    if currentScene and currentScene.data then
+        SetNewWaypoint(currentScene.data.coords.x, currentScene.data.coords.y)
+        QBCore.Functions.Notify("GPS set to crime scene: " .. currentScene.data.label, "success")
+    else
+        QBCore.Functions.Notify("No active crime scene to navigate to.", "error")
+    end
+    cb('ok')
+end)
+
+-- Create thread for job center interaction with next job indicator
 CreateThread(function()
     local jobCenterBlip = CreateJobCenterBlip()
     
@@ -440,7 +485,24 @@ CreateThread(function()
             DrawMarker(2, Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.3, 255, 255, 255, 100, false, true, 2, false, nil, nil, false)
             
             if dist < 2.0 then
-                DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
+                if not onDuty then
+                    DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
+                else
+                    -- Different message when on duty
+                    if currentScene then
+                        DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access job menu | [G] to get next job location")
+                        
+                        -- Add G key for quick "next job" navigation
+                        if IsControlJustPressed(0, 47) then -- G key
+                            if DoesBlipExist(currentScene.blip) then
+                                SetNewWaypoint(currentScene.data.coords.x, currentScene.data.coords.y)
+                                QBCore.Functions.Notify("GPS set to next crime scene: " .. currentScene.data.label, "success")
+                            end
+                        end
+                    else
+                        DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
+                    end
+                end
                 
                 if IsControlJustPressed(0, 38) then -- E key
                     ToggleJobUI()

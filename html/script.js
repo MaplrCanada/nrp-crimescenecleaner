@@ -63,9 +63,29 @@ $(document).ready(function() {
         $.post("https://nrp-crimescenecleaner/endShift", JSON.stringify({}));
         showNotification("Ending shift...", "info");
     });
+
+     // Navigate to job button
+     $("#navigate-job").click(function() {
+        $.post("https://crime-scene-cleaner/navigateToJob", JSON.stringify({}));
+        showNotification("Setting GPS to crime scene location...", "info");
+    });
 });
 
-// NUI message handler
+// Update scene status
+function updateSceneStatus(status) {
+    $("#scene-status").text(status);
+    
+    // Add color coding based on status
+    if (status === "Completed") {
+        $("#scene-status").css("color", "#4CAF50"); // Green
+    } else if (status === "In Progress") {
+        $("#scene-status").css("color", "#FFC107"); // Amber
+    } else {
+        $("#scene-status").css("color", "#AAA"); // Default
+    }
+}
+
+// NUI message handler - Update to include status handling
 window.addEventListener('message', function(event) {
     const data = event.data;
     
@@ -79,6 +99,10 @@ window.addEventListener('message', function(event) {
         if (data.currentScene) {
             updateSceneInfo(data.currentScene);
         }
+    }
+    
+    if (data.action === "updateSceneStatus") {
+        updateSceneStatus(data.status);
     }
     
     if (data.action === "notification") {
