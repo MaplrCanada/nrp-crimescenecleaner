@@ -1,3 +1,4 @@
+-- client/main.lua
 local QBCore = exports['qb-core']:GetCoreObject()
 local PlayerData = {}
 local onDuty = false
@@ -98,6 +99,7 @@ local function RemoveWorkVehicle()
 end
 
 -- Select a random crime scene with enhanced scene creation
+-- Update the SelectCrimeScene function to use your custom prop
 local function SelectCrimeScene()
     if #Config.CrimeScenes == 0 then return nil end
     
@@ -125,9 +127,73 @@ local function SelectCrimeScene()
         )
     end
     
-    -- Add crime scene props
+    -- Create the dead body prop using the custom model from low.ytyp
+    local deadBodyModel = GetHashKey("low")
+    
+    -- Request the model
+    RequestModel(deadBodyModel)
+    
+    -- Wait for the model to load
+    local attempts = 0
+    while not HasModelLoaded(deadBodyModel) and attempts < 100 do
+        Wait(10)
+        attempts = attempts + 1
+    end
+    
+    -- Create the dead body if model loaded
+    if HasModelLoaded(deadBodyModel) then
+        -- Create the dead body at the scene location
+        local deadBody = CreateObject(
+            deadBodyModel,
+            coords.x, 
+            coords.y, 
+            coords.z - 1.0, 
+            false, false, false
+        )
+        
+        -- Set rotation appropriate for a dead body
+        SetEntityRotation(deadBody, 
+            0.0, 
+            0.0, 
+            math.random(0, 359) + 0.0, 
+            2, true
+        )
+        
+        -- Ensure props stay in place
+        FreezeEntityPosition(deadBody, true)
+        
+        SetModelAsNoLongerNeeded(deadBodyModel)
+    else
+        -- Fallback to the default prop if custom model fails to load
+        Debug("Failed to load custom dead body model, using fallback")
+        local fallbackModel = GetHashKey("prop_cs_dead_guy_01")
+        RequestModel(fallbackModel)
+        
+        while not HasModelLoaded(fallbackModel) do
+            Wait(10)
+        end
+        
+        local deadBody = CreateObject(
+            fallbackModel,
+            coords.x, 
+            coords.y, 
+            coords.z - 1.0, 
+            false, false, false
+        )
+        
+        SetEntityRotation(deadBody, 
+            0.0, 
+            0.0, 
+            math.random(0, 359) + 0.0, 
+            2, true
+        )
+        
+        FreezeEntityPosition(deadBody, true)
+        SetModelAsNoLongerNeeded(fallbackModel)
+    end
+    
+    -- Add crime scene props (additional environmental props)
     local scenePropModels = {
-        "prop_cs_dead_guy_01", -- Dead body (won't be interactive)
         "prop_bodyarmour_03",
         "prop_cs_fertilizer",
         "prop_cs_beer_bot_40oz_03",
