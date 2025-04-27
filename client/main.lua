@@ -377,6 +377,10 @@ end
 -- Clean crime scene function (with UI status update)
 local function CleanCrimeScene()
     if not currentScene then return end
+    if not onDuty or PlayerData.job.name ~= Config.JobName then
+        QBCore.Functions.Notify("You are not authorized to clean crime scenes.", "error")
+        return
+    end
     
     local playerPed = PlayerPedId()
     local dict = Config.CleaningAnimations.dict
@@ -437,47 +441,6 @@ local function CleanCrimeScene()
                 end
             end
         end
-        
-        -- Add visual feedback of cleaning with multiple effects
-        local effectCoords = {
-            vector3(sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.9),
-            vector3(sceneCoords.x + 0.7, sceneCoords.y + 0.7, sceneCoords.z - 0.9),
-            vector3(sceneCoords.x - 0.7, sceneCoords.y - 0.7, sceneCoords.z - 0.9),
-            vector3(sceneCoords.x + 0.7, sceneCoords.y - 0.7, sceneCoords.z - 0.9),
-            vector3(sceneCoords.x - 0.7, sceneCoords.y + 0.7, sceneCoords.z - 0.9)
-        }
-
-        -- Steam effects
-        UseParticleFxAssetNextCall("core")
-        for _, coords in ipairs(effectCoords) do
-            StartParticleFxLoopedAtCoord("ent_amb_steam", 
-                coords.x, coords.y, coords.z, 
-                0.0, 0.0, 0.0, 1.0, false, false, false, false)
-        end
-
-        -- Water splash effects
-        UseParticleFxAssetNextCall("core")
-        for _, coords in ipairs(effectCoords) do
-            StartParticleFxLoopedAtCoord("ent_amb_water_drips", 
-                coords.x, coords.y, coords.z, 
-                0.0, 0.0, 0.0, 1.5, false, false, false, false)
-        end
-
-        -- Foam/soap bubbles for cleaning effect
-        UseParticleFxAssetNextCall("scr_mp_cig")
-        for i=1, 3 do
-            local randX = sceneCoords.x + (math.random(-20, 20) / 10)
-            local randY = sceneCoords.y + (math.random(-20, 20) / 10)
-            StartParticleFxLoopedAtCoord("scr_mp_bubbles", 
-                randX, randY, sceneCoords.z - 0.7, 
-                0.0, 0.0, 0.0, 1.0, false, false, false, false)
-        end
-
-        -- Make water puddle on ground for realistic effect
-        UseParticleFxAssetNextCall("core")
-        StartParticleFxLoopedAtCoord("ent_col_water_puddle", 
-            sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.95, 
-            0.0, 0.0, 0.0, 3.0, false, false, false, false)
             
         -- Remove the blip from the map
         if currentScene.blip then
@@ -581,8 +544,14 @@ local function EndShift()
     })
 end
 
--- Toggle job UI
+-- Toggle job UI with job check
 local function ToggleJobUI()
+    -- Check job first
+    if PlayerData.job.name ~= Config.JobName then
+        QBCore.Functions.Notify("You are not authorized to use this system.", "error")
+        return false
+    end
+    
     uiOpen = not uiOpen
     
     SendNUIMessage({
@@ -592,11 +561,16 @@ local function ToggleJobUI()
     })
     
     SetNuiFocus(uiOpen, uiOpen)
+    return true
 end
 
 -- Event handlers
 RegisterNetEvent('nrp-crimescenecleaner:client:ToggleJobUI', function()
-    ToggleJobUI()
+    if PlayerData.job and PlayerData.job.name == Config.JobName then
+        ToggleJobUI()
+    else
+        QBCore.Functions.Notify("You are not authorized to use this system.", "error")
+    end
 end)
 
 -- NUI Callbacks
@@ -642,30 +616,33 @@ CreateThread(function()
         
         if dist < 10 then
             sleep = 0
-            DrawMarker(2, Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.3, 255, 255, 255, 100, false, true, 2, false, nil, nil, false)
-            
-            if dist < 2.0 then
-                if not onDuty then
-                    DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
-                else
-                    -- Different message when on duty
-                    if currentScene then
-                        DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access job menu | [G] to get next job location")
-                        
-                        -- Add G key for quick "next job" navigation
-                        if IsControlJustPressed(0, 47) then -- G key
-                            if DoesBlipExist(currentScene.blip) then
-                                SetNewWaypoint(currentScene.data.coords.x, currentScene.data.coords.y)
-                                QBCore.Functions.Notify("GPS set to next crime scene: " .. currentScene.data.label, "success")
-                            end
-                        end
-                    else
-                        DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
-                    end
-                end
+            -- Only show markers to players with the job
+            if PlayerData.job and PlayerData.job.name == Config.JobName then
+                DrawMarker(2, Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.3, 0.3, 0.3, 255, 255, 255, 100, false, true, 2, false, nil, nil, false)
                 
-                if IsControlJustPressed(0, 38) then -- E key
-                    ToggleJobUI()
+                if dist < 2.0 then
+                    if not onDuty then
+                        DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
+                    else
+                        -- Different message when on duty
+                        if currentScene then
+                            DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access job menu | [G] to get next job location")
+                            
+                            -- Add G key for quick "next job" navigation
+                            if IsControlJustPressed(0, 47) then -- G key
+                                if DoesBlipExist(currentScene.blip) then
+                                    SetNewWaypoint(currentScene.data.coords.x, currentScene.data.coords.y)
+                                    QBCore.Functions.Notify("GPS set to next crime scene: " .. currentScene.data.label, "success")
+                                end
+                            end
+                        else
+                            DrawText3D(Config.JobCenter.x, Config.JobCenter.y, Config.JobCenter.z + 1.3, "Press [E] to access Crime Scene Cleaner job")
+                        end
+                    end
+                    
+                    if IsControlJustPressed(0, 38) then -- E key
+                        ToggleJobUI()
+                    end
                 end
             end
         end
@@ -721,7 +698,11 @@ end
 
 -- Command to toggle the UI
 RegisterCommand('cleanerjob', function()
-    ToggleJobUI()
+    if PlayerData.job and PlayerData.job.name == Config.JobName then
+        ToggleJobUI()
+    else
+        QBCore.Functions.Notify("You are not authorized to use this command.", "error")
+    end
 end, false)
 
 -- Event when resource stops
