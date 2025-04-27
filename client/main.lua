@@ -99,7 +99,6 @@ local function RemoveWorkVehicle()
 end
 
 -- Select a random crime scene with enhanced scene creation
--- Update the SelectCrimeScene function to use your custom prop
 local function SelectCrimeScene()
     if #Config.CrimeScenes == 0 then return nil end
     
@@ -241,6 +240,65 @@ local function SelectCrimeScene()
             FreezeEntityPosition(propObject, true)
         end
     end
+
+    -- Add police officers at the scene
+    local pedModels = {
+        "s_m_y_cop_01",
+        "s_f_y_cop_01",
+        "s_m_y_hwaycop_01"
+    }
+
+    -- Add 2-3 police officers
+    local numPeds = math.random(2, 3)
+    for i = 1, numPeds do
+        local modelHash = GetHashKey(pedModels[math.random(1, #pedModels)])
+        RequestModel(modelHash)
+        
+        local attempts = 0
+        while not HasModelLoaded(modelHash) and attempts < 100 do
+            Wait(10)
+            attempts = attempts + 1
+        end
+        
+        if HasModelLoaded(modelHash) then
+            -- Position the ped with an offset from the crime scene
+            local xOffset = math.random(-30, 30) / 10
+            local yOffset = math.random(-30, 30) / 10
+            
+            local policePed = CreatePed(
+                4, 
+                modelHash, 
+                coords.x + xOffset, 
+                coords.y + yOffset, 
+                coords.z - 1.0, 
+                math.random(0, 359) + 0.0, 
+                false, 
+                true
+            )
+            
+            -- Make the ped permanent until scene is cleaned
+            SetEntityAsMissionEntity(policePed, true, true)
+            
+            -- Add to a table to track and remove later
+            table.insert(scenePeds, policePed)
+            
+            -- Set ped attributes
+            SetBlockingOfNonTemporaryEvents(policePed, true)
+            SetPedFleeAttributes(policePed, 0, false)
+            
+            -- Give the ped a random task
+            local tasks = {
+                "WORLD_HUMAN_CLIPBOARD",
+                "WORLD_HUMAN_STAND_IMPATIENT",
+                "WORLD_HUMAN_GUARD_STAND",
+                "WORLD_HUMAN_COP_IDLES"
+            }
+            
+            TaskStartScenarioInPlace(policePed, tasks[math.random(1, #tasks)], 0, true)
+            
+            SetModelAsNoLongerNeeded(modelHash)
+        end
+    end
     
     -- Add police tape around the area
     local tapeModel = GetHashKey("prop_barrier_work05")
@@ -379,11 +437,46 @@ local function CleanCrimeScene()
             end
         end
         
-        -- Add visual feedback of cleaning (particles/effects)
+        -- Add visual feedback of cleaning with multiple effects
+        local effectCoords = {
+            vector3(sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.9),
+            vector3(sceneCoords.x + 0.7, sceneCoords.y + 0.7, sceneCoords.z - 0.9),
+            vector3(sceneCoords.x - 0.7, sceneCoords.y - 0.7, sceneCoords.z - 0.9),
+            vector3(sceneCoords.x + 0.7, sceneCoords.y - 0.7, sceneCoords.z - 0.9),
+            vector3(sceneCoords.x - 0.7, sceneCoords.y + 0.7, sceneCoords.z - 0.9)
+        }
+
+        -- Steam effects
         UseParticleFxAssetNextCall("core")
-        StartParticleFxLoopedAtCoord("ent_amb_steam", 
-            sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.9, 
-            0.0, 0.0, 0.0, 1.0, false, false, false, false)
+        for _, coords in ipairs(effectCoords) do
+            StartParticleFxLoopedAtCoord("ent_amb_steam", 
+                coords.x, coords.y, coords.z, 
+                0.0, 0.0, 0.0, 1.0, false, false, false, false)
+        end
+
+        -- Water splash effects
+        UseParticleFxAssetNextCall("core")
+        for _, coords in ipairs(effectCoords) do
+            StartParticleFxLoopedAtCoord("ent_amb_water_drips", 
+                coords.x, coords.y, coords.z, 
+                0.0, 0.0, 0.0, 1.5, false, false, false, false)
+        end
+
+        -- Foam/soap bubbles for cleaning effect
+        UseParticleFxAssetNextCall("scr_mp_cig")
+        for i=1, 3 do
+            local randX = sceneCoords.x + (math.random(-20, 20) / 10)
+            local randY = sceneCoords.y + (math.random(-20, 20) / 10)
+            StartParticleFxLoopedAtCoord("scr_mp_bubbles", 
+                randX, randY, sceneCoords.z - 0.7, 
+                0.0, 0.0, 0.0, 1.0, false, false, false, false)
+        end
+
+        -- Make water puddle on ground for realistic effect
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxLoopedAtCoord("ent_col_water_puddle", 
+            sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.95, 
+            0.0, 0.0, 0.0, 3.0, false, false, false, false)
             
         -- Remove the blip from the map
         if currentScene.blip then
