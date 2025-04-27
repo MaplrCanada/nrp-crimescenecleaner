@@ -7,6 +7,7 @@ local cleaningEquipmentObject = nil
 local currentScene = nil
 local activeBlips = {}
 local uiOpen = false
+local scenePeds = {}
 
 -- Initialize player data when player loads
 RegisterNetEvent('QBCore:Client:OnPlayerLoaded', function()
