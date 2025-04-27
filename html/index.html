@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crime Scene Cleaner</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="job-container" class="hidden">
+        <div class="header">
+            <h1><i class="fas fa-spray-can"></i> Crime Scene Cleaner</h1>
+            <div class="close-btn" id="close-ui"><i class="fas fa-times"></i></div>
+        </div>
+        
+        <div class="content">
+            <div class="job-status">
+                <div class="status-indicator">
+                    <div class="status-dot" id="status-dot"></div>
+                    <span id="duty-status">OFF DUTY</span>
+                </div>
+            </div>
+            
+            <div class="job-info" id="job-info">
+                <div class="info-panel" id="inactive-panel">
+                    <h2>Job Information</h2>
+                    <p>As a crime scene cleaner, your job is to clean up after incidents around the city.</p>
+                    <p>Each crime scene will have blood and other materials that need to be properly cleaned and disposed of.</p>
+                    <p>Use the company vehicle to travel between locations.</p>
+                    <p>You will be paid per job completed.</p>
+                    
+                    <div class="button-container">
+                        <button id="start-shift" class="btn"><i class="fas fa-play"></i> Start Shift</button>
+                    </div>
+                </div>
+                
+                <div class="info-panel hidden" id="active-panel">
+                    <h2>Current Assignment</h2>
+                    <div class="assignment-details">
+                        <div class="detail-row">
+                            <span class="detail-label">Location:</span>
+                            <span class="detail-value" id="scene-location">Loading...</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Type:</span>
+                            <span class="detail-value" id="scene-type">Blood Cleanup</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label">Status:</span>
+                            <span class="detail-value" id="scene-status">Pending</span>
+                        </div>
+                    </div>
+                    
+                    <div class="instructions">
+                        <h3>Instructions:</h3>
+                        <ol>
+                            <li>Drive to the marked location</li>
+                            <li>Approach the crime scene</li>
+                            <li>Press [E] to begin cleaning</li>
+                            <li>Wait for cleaning to complete</li>
+                            <li>Proceed to the next location when available</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="button-container">
+                        <button id="end-shift" class="btn btn-danger"><i class="fas fa-stop"></i> End Shift</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="company-name">Los Santos Biohazard Cleanup Inc.</div>
+            <div class="company-slogan">"We clean what others can't stomach"</div>
+        </div>
+    </div>
+    
+    <!-- Notification container -->
+    <div id="notification-container"></div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
