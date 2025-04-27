@@ -13,10 +13,17 @@ Config.VehicleSpawnLocation = vector4(1157.54, -1466.37, 34.69, 357.82) -- Where
 
 -- Cleaning equipment - used for animations and props
 Config.CleaningEquipment = {
-    prop = "prop_tool_mopbucket", -- Prop used during cleaning
-    bone = 28422, -- Which bone to attach the prop to
-    offset = vector3(0.0, -0.25, -0.15), -- Position offset
-    rotation = vector3(0.0, 0.0, 0.0) -- Rotation offset
+    prop = "prop_sponge_01", -- Sponge instead of mop bucket
+    bone = 28422, -- Right hand bone
+    offset = vector3(0.0, 0.0, -0.01), -- Adjusted offset
+    rotation = vector3(90.0, 0.0, 0.0) -- Adjusted rotation
+}
+
+-- Animation dictionaries to use for cleaning
+Config.CleaningAnimations = {
+    dict = "timetable@floyd@clean_kitchen@base", -- Better cleaning animation
+    anim = "base", -- Animation to play
+    flag = 1 -- Animation flag
 }
 
 -- Job center location

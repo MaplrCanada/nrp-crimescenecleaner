@@ -97,7 +97,7 @@ local function RemoveWorkVehicle()
     end
 end
 
--- Select a random crime scene
+-- Select a random crime scene with enhanced scene creation
 local function SelectCrimeScene()
     if #Config.CrimeScenes == 0 then return nil end
     
@@ -108,12 +108,7 @@ local function SelectCrimeScene()
     local coords = scene.coords
     
     -- Add random blood decals in the area
-    local decalTypes = {
-        "Blood splatter",
-        "Blood pool"
-    }
-    
-    for i = 1, math.random(3, 7) do
+    for i = 1, math.random(5, 12) do
         local xOffset = math.random(-20, 20) / 10
         local yOffset = math.random(-20, 20) / 10
         
@@ -129,6 +124,78 @@ local function SelectCrimeScene()
             false, true, false
         )
     end
+    
+    -- Add crime scene props
+    local scenePropModels = {
+        "prop_cs_dead_guy_01", -- Dead body (won't be interactive)
+        "prop_bodyarmour_03",
+        "prop_cs_fertilizer",
+        "prop_cs_beer_bot_40oz_03",
+        "prop_cs_sh_bong",
+        "prop_cs_street_binbag_01",
+        "prop_bin_08a",
+        "prop_cs_rub_binbag_01"
+    }
+    
+    -- Add 2-4 random props
+    local numProps = math.random(2, 4)
+    for i = 1, numProps do
+        local propModel = scenePropModels[math.random(1, #scenePropModels)]
+        local xOffset = math.random(-30, 30) / 10
+        local yOffset = math.random(-30, 30) / 10
+        
+        local propHash = GetHashKey(propModel)
+        RequestModel(propHash)
+        
+        local attempts = 0
+        while not HasModelLoaded(propHash) and attempts < 100 do
+            Wait(10)
+            attempts = attempts + 1
+        end
+        
+        if HasModelLoaded(propHash) then
+            local propObject = CreateObject(
+                propHash, 
+                coords.x + xOffset, 
+                coords.y + yOffset, 
+                coords.z - 1.0, 
+                false, false, false
+            )
+            SetModelAsNoLongerNeeded(propHash)
+            
+            -- Give props random rotation
+            SetEntityRotation(propObject, 
+                math.random(0, 359) + 0.0, 
+                math.random(0, 359) + 0.0, 
+                math.random(0, 359) + 0.0, 
+                2, true
+            )
+            
+            -- Ensure props stay in place
+            FreezeEntityPosition(propObject, true)
+        end
+    end
+    
+    -- Add police tape around the area
+    local tapeModel = GetHashKey("prop_barrier_work05")
+    RequestModel(tapeModel)
+    
+    while not HasModelLoaded(tapeModel) do
+        Wait(10)
+    end
+    
+    -- Create police tape in a perimeter
+    for i = 0, 3 do
+        local angle = (i * 90) * math.pi / 180.0
+        local x = coords.x + math.cos(angle) * 3.0
+        local y = coords.y + math.sin(angle) * 3.0
+        
+        local tapeObject = CreateObject(tapeModel, x, y, coords.z - 1.0, false, false, false)
+        SetEntityRotation(tapeObject, 0.0, 0.0, angle * 180.0 / math.pi, 2, true)
+        FreezeEntityPosition(tapeObject, true)
+    end
+    
+    SetModelAsNoLongerNeeded(tapeModel)
     
     currentScene = {
         index = sceneIndex,
@@ -182,12 +249,13 @@ local function DetachCleaningEquipment()
     end
 end
 
--- Clean crime scene function
+-- Clean crime scene function (Updated animation)
 local function CleanCrimeScene()
     if not currentScene then return end
     
     local playerPed = PlayerPedId()
-    local dict = "amb@world_human_maid_clean@base"
+    local dict = Config.CleaningAnimations.dict
+    local anim = Config.CleaningAnimations.anim
     
     -- Check if player is near crime scene
     local playerCoords = GetEntityCoords(playerPed)
@@ -202,7 +270,13 @@ local function CleanCrimeScene()
     LoadAnimDict(dict)
     AttachCleaningEquipment()
     
-    TaskPlayAnim(playerPed, dict, "base", 8.0, -8.0, -1, 1, 0, false, false, false)
+    -- We'll add kneeling animation first
+    TaskStartScenarioInPlace(playerPed, "WORLD_HUMAN_GARDENER_PLANT", 0, true)
+    Wait(1000)
+    ClearPedTasks(playerPed)
+    
+    -- Now play the cleaning animation
+    TaskPlayAnim(playerPed, dict, anim, 8.0, -8.0, -1, Config.CleaningAnimations.flag, 0, false, false, false)
     
     QBCore.Functions.Progressbar("clean_scene", "Cleaning crime scene...", Config.CleaningTime * 1000, false, true, {
         disableMovement = true,
@@ -210,18 +284,43 @@ local function CleanCrimeScene()
         disableMouse = false,
         disableCombat = true,
     }, {}, {}, {}, function() -- Done
-        StopAnimTask(playerPed, dict, "base", 1.0)
+        StopAnimTask(playerPed, dict, anim, 1.0)
         DetachCleaningEquipment()
         
-        -- Remove blood decals in area
-        RemoveDecalsInRange(sceneCoords, 15.0)
+        -- Alternate animation to show scrubbing the floor
+        LoadAnimDict("amb@world_human_bum_wash@male@low@idle_a")
+        TaskPlayAnim(playerPed, "amb@world_human_bum_wash@male@low@idle_a", "idle_a", 8.0, -8.0, 3000, 0, 0, false, false, false)
+        Wait(3000)
+        ClearPedTasks(playerPed)
         
-        -- Remove the blip
-        RemoveBlip(currentScene.blip)
-        currentScene.blip = nil
+        -- Remove blood decals in area
+        RemoveDecalsInRange(sceneCoords, 20.0)
+        
+        -- Also remove any props in the area that might be part of the scene
+        local props = GetGamePool('CObject')
+        for _, object in ipairs(props) do
+            if #(GetEntityCoords(object) - sceneCoords) < 10.0 then
+                -- Only remove objects that aren't attached to anything (likely scene props)
+                if not IsEntityAttached(object) and not NetworkGetEntityIsNetworked(object) then
+                    DeleteEntity(object)
+                end
+            end
+        end
+        
+        -- Add visual feedback of cleaning (particles/effects)
+        UseParticleFxAssetNextCall("core")
+        StartParticleFxLoopedAtCoord("ent_amb_steam", 
+            sceneCoords.x, sceneCoords.y, sceneCoords.z - 0.9, 
+            0.0, 0.0, 0.0, 1.0, false, false, false, false)
+            
+        -- Remove the blip from the map
+        if currentScene.blip then
+            RemoveBlip(currentScene.blip)
+            currentScene.blip = nil
+        end
         
         -- Notify server about completion
-        TriggerServerEvent("nrp-crimescenecleaner:server:SceneCleaned")
+        TriggerServerEvent("crime-cleaner:server:SceneCleaned")
         
         -- Reset current scene
         currentScene = nil
@@ -231,7 +330,7 @@ local function CleanCrimeScene()
         SelectCrimeScene()
         QBCore.Functions.Notify("Crime scene cleaned! Head to the next location.", "success")
     end, function() -- Cancel
-        StopAnimTask(playerPed, dict, "base", 1.0)
+        StopAnimTask(playerPed, dict, anim, 1.0)
         DetachCleaningEquipment()
         QBCore.Functions.Notify("Cleaning cancelled.", "error")
     end)

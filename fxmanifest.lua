@@ -3,7 +3,7 @@ game 'gta5'
 
 description 'Crime Scene Cleaner Job for QB-Core'
 author 'NineScripts'
-version '1.0.0'
+version '1.1.0'
 
 shared_script 'config.lua'
 client_script 'client/main.lua'
